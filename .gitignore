@@ -1,0 +1,8 @@
+# Created by .ignore support plugin (hsz.mobi)
+.idea
+
+#ec2
+ec2/ec2_instances_reference.iml
+ec2/src/main/resources
+ec2/src/test
+
