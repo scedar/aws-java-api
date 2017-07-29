@@ -8,25 +8,31 @@ import java.util.List;
 
 public class Requests {
 
-    public static void runInstance(){
+    /**TODO
+     * While in production mode, Always dry run a request before actually making it.
+     * To dry run, use the lambda resource below:
+     *       DryRunSupportedRequest<[Your Request]> dryRequest =
+     *               () -> {
+     *                       [Your Request] request = new [Your Request]()
+     *                   .withInstanceIds(instance_id);
+     *
+     *           return request.getDryRunRequest();
+     *       };
+     *
+     *       DryRunResult dryResponse = ec2.dryRun(dryRequest);
+     *
+     *           if (!dryResponse.isSuccessful()) {
+     *           System.out.printf(
+     *                   "Failed dry run to enable monitoring on instance %s",
+     *                   instance_id);
+     *
+     *           throw dryResponse.getDryRunResponse();
+     *       }
+     */
+
+    public static Results.InstanceResults runInstance(AmazonEc2 ec2){
 
         RunInstancesRequest runInstancesRequest = new RunInstancesRequest();
-
-        AmazonEc2 ec2 = new AmazonEc2();
-        ec2.setEc2Instance(AmazonEc2.initializeObject(AwsCredentials.getAwsCredentials()));
-        ec2.setRegion(Regions.US_WEST_2);
-        ec2.setImageId("ami-835b4efa");
-        ec2.setInstanceType(Constants.EC2InstanceType.T2_NANO);
-        ec2.setMinCount(1);
-        ec2.setMaxCount(1);
-        ec2.setBlockDeviceMappingName("/dev/sda1");
-        ec2.setVolumeSize(10);
-        ec2.setVolumeType(VolumeType.Gp2);
-        ec2.setDeleteVolumeOnTerminate(true);
-        ec2.setKeyName("skyworld");
-        ec2.setAdditionalInfo("Created By Scedar Technologies Co.");
-        ec2.setPrivateIpAddress("172.31.16.15");
-        ec2.setSubnetId("subnet-5d20c33b");
 
         runInstancesRequest
                 .withImageId(ec2.getImageId())
@@ -58,9 +64,11 @@ public class Requests {
             System.out.println("Instance: "+instance.getInstanceId());
             id++;
         }
+
+        return result;
     }
 
-    public static void stopInstance(final String instanceId, AmazonEC2 ec2){
+    public static void stopInstance(final String instanceId, final AmazonEC2 ec2){
         StopInstancesRequest stopInstancesRequest = new StopInstancesRequest().withInstanceIds(instanceId);
         StopInstancesResult stopInstancesResult = ec2.stopInstances(stopInstancesRequest);
         List<InstanceStateChange> stateChangeList = stopInstancesResult.getStoppingInstances();
@@ -68,7 +76,7 @@ public class Requests {
         System.out.println(stateChangeList.toString());
     }
 
-    public static void startInstance(final String instanceId, AmazonEC2 ec2){
+    public static void startInstance(final String instanceId, final AmazonEC2 ec2){
         StartInstancesRequest startRequest = new StartInstancesRequest()
                 .withInstanceIds(instanceId);
         StartInstancesResult startResult = ec2.startInstances(startRequest);
@@ -77,16 +85,76 @@ public class Requests {
         System.out.println(stateChangeList.toString());
     }
 
-    public static void terminateInstance(final String instanceId, AmazonEC2 ec2)
+    public static void rebootInstance(final String instanceId, final AmazonEC2 ec2){
+        RebootInstancesRequest request = new RebootInstancesRequest()
+                .withInstanceIds(instanceId);
+        RebootInstancesResult response = ec2.rebootInstances(request);
+        System.out.printf(
+                "Successfully rebooted instance %s", instanceId);
+    }
+
+    public static void enableMonitorInstance(final String instanceId, final AmazonEC2 ec2){
+        MonitorInstancesRequest request = new MonitorInstancesRequest()
+                .withInstanceIds(instanceId);
+        MonitorInstancesResult response = ec2.monitorInstances(request);
+        List<InstanceMonitoring> instanceMonitoringList = response.getInstanceMonitorings();
+        System.out.println("Enabled Monitoring on instance '" + instanceId + "':");
+        System.out.println(instanceMonitoringList.toString());
+    }
+
+    public static void disableeMonitorInstance(final String instanceId, final AmazonEC2 ec2){
+        UnmonitorInstancesRequest request = new UnmonitorInstancesRequest()
+                .withInstanceIds(instanceId);
+        UnmonitorInstancesResult response = ec2.unmonitorInstances(request);
+        List<InstanceMonitoring> instanceMonitoringList = response.getInstanceMonitorings();
+        System.out.println("Disabled Monitoring on instance '" + instanceId + "':");
+        System.out.println(instanceMonitoringList.toString());
+    }
+
+    public static void describeInstance(final AmazonEC2 ec2){
+        boolean done = false;
+
+        while(!done) {
+            DescribeInstancesRequest request = new DescribeInstancesRequest();
+            DescribeInstancesResult response = ec2.describeInstances(request);
+
+            for(Reservation reservation : response.getReservations()) {
+                for(Instance instance : reservation.getInstances()) {
+                    System.out.printf(
+                            "Found reservation with id %s, " +
+                                    "AMI %s, " +
+                                    "type %s, " +
+                                    "state %s " +
+                                    "and monitoring state %s",
+                            instance.getInstanceId(),
+                            instance.getImageId(),
+                            instance.getInstanceType(),
+                            instance.getState().getName(),
+                            instance.getMonitoring().getState() + "\n\n");
+                }
+            }
+
+            request.setNextToken(response.getNextToken());
+
+            if(response.getNextToken() == null) {
+                done = true;
+            }
+        }
+    }
+
+    public static void terminateInstance(final String instanceId, final AmazonEC2 ec2)
     {
-        TerminateInstancesRequest terminateInstancesRequest = new TerminateInstancesRequest().withInstanceIds(instanceId);
-        TerminateInstancesResult terminateInstancesResult = ec2.terminateInstances(terminateInstancesRequest);
-        List<InstanceStateChange> stateChangeList = terminateInstancesResult.getTerminatingInstances();
+        TerminateInstancesRequest terminateInstancesRequest =
+                new TerminateInstancesRequest().withInstanceIds(instanceId);
+        TerminateInstancesResult terminateInstancesResult =
+                ec2.terminateInstances(terminateInstancesRequest);
+        List<InstanceStateChange> stateChangeList =
+                terminateInstancesResult.getTerminatingInstances();
         System.out.println("Terminating instance '" + instanceId + "':");
         System.out.println(stateChangeList.toString());
     }
 
-    public static void createElasticIP(final String instance_id){
+    public static void allocateElasticIP(final String instance_id){
         final AmazonEC2 ec2 = AmazonEC2ClientBuilder.defaultClient();
 
         AllocateAddressRequest allocate_request = new AllocateAddressRequest()
@@ -97,7 +165,8 @@ public class Requests {
 
         String allocation_id = allocate_response.getAllocationId();
         allocate_response.getPublicIp();
-        System.out.println("Alloc ID - "+allocate_response.getAllocationId()+"\nIP - "+allocate_response.getPublicIp());
+        System.out.println("Alloc ID - "+allocate_response.getAllocationId()+
+                "\nIP - "+allocate_response.getPublicIp());
 
         AssociateAddressRequest associate_request =
                 new AssociateAddressRequest()
@@ -109,6 +178,48 @@ public class Requests {
 
         System.out.println(associate_request.toString());
         System.out.println(associate_response.toString());
+    }
+
+    public static void createSecurityGroup(final SecurityGroup securityGroup, final AmazonEC2 ec2){
+        CreateSecurityGroupRequest create_request = new
+                CreateSecurityGroupRequest()
+                .withGroupName(securityGroup.getGroupName())
+                .withDescription(securityGroup.getGroupDescription())
+                .withVpcId(securityGroup.getVpcId());
+
+        CreateSecurityGroupResult create_response =
+                ec2.createSecurityGroup(create_request);
+
+        System.out.printf(
+                "Successfully created security group named %s",
+                securityGroup.getGroupName());
+
+        IpRange ip_range = new IpRange()
+                .withCidrIp(securityGroup.getcIDrIp());
+
+        IpPermission ip_perm = new IpPermission()
+                .withIpProtocol(securityGroup.getIpProtocol1())
+                .withToPort(securityGroup.getToPort1())
+                .withFromPort(securityGroup.getFromPort1())
+                .withIpv4Ranges(ip_range);
+
+        IpPermission ip_perm2 = new IpPermission()
+                .withIpProtocol(securityGroup.getIpProtocol2())
+                .withToPort(securityGroup.getToPort2())
+                .withFromPort(securityGroup.getFromPort2())
+                .withIpv4Ranges(ip_range);
+
+        AuthorizeSecurityGroupIngressRequest auth_request = new
+                AuthorizeSecurityGroupIngressRequest()
+                .withGroupName(securityGroup.getGroupName())
+                .withIpPermissions(ip_perm, ip_perm2);
+
+        AuthorizeSecurityGroupIngressResult auth_response =
+                ec2.authorizeSecurityGroupIngress(auth_request);
+
+        System.out.printf(
+                "Successfully added ingress policy to security group %s",
+                securityGroup.getGroupName());
     }
 
     public static void releaseElasticIP(final String alloc_id){
@@ -124,7 +235,7 @@ public class Requests {
         System.out.println(response);
     }
 
-    public static void adjustVolume(final String instanceId, AmazonEC2 ec2, String volumeId, int volumeSize) {
+    public static void adjustVolume(final String instanceId, final AmazonEC2 ec2, String volumeId, int volumeSize) {
 
         ModifyVolumeRequest modifyVolumeRequest = new ModifyVolumeRequest();
         modifyVolumeRequest.setSize(volumeSize);
@@ -137,7 +248,7 @@ public class Requests {
 
     }
 
-    public static void changeInstanceType(final String instanceId, AmazonEC2 ec2, String instanceType){
+    public static void changeInstanceType(final String instanceId, final AmazonEC2 ec2, String instanceType){
         ModifyInstanceAttributeRequest modifyInstanceAttributeRequest = new ModifyInstanceAttributeRequest();
         modifyInstanceAttributeRequest.withInstanceId(instanceId);
         modifyInstanceAttributeRequest.withInstanceType(instanceType);
@@ -147,7 +258,7 @@ public class Requests {
         System.out.println("Modifying instance '" + instanceId + "':");
     }
 
-    public static void createEC2Volume(final String instanceId, AmazonEC2 ec2, int volumeSize, Regions region)
+    public static void createEC2Volume(final String instanceId, final AmazonEC2 ec2, int volumeSize, Regions region)
     {
         System.out.println("Creating the volume begins...");
         CreateVolumeRequest  creq = new CreateVolumeRequest(volumeSize, region.getName());
