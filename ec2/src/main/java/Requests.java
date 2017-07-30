@@ -2,6 +2,7 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2ClientBuilder;
 import com.amazonaws.services.ec2.model.*;
+import com.amazonaws.services.ec2.model.SecurityGroup;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +31,92 @@ public class Requests {
      *       }
      */
 
-    public static Results.InstanceResults runInstance(AmazonEc2 ec2){
+    public static void createSecurityGroup(final SecurityGroupConfig securityGroup){
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
+        CreateSecurityGroupRequest createRequest = new
+                CreateSecurityGroupRequest()
+                .withGroupName(securityGroup.getGroupName())
+                .withDescription(securityGroup.getGroupDescription())
+                .withVpcId(securityGroup.getVpcId());
+
+        CreateSecurityGroupResult createResponse =
+                ec2.createSecurityGroup(createRequest);
+
+        System.out.printf(
+                "Successfully created security group named %s",
+                securityGroup.getGroupName());
+
+        IpRange ipRange = new IpRange()
+                .withCidrIp(securityGroup.getcIDrIp());
+
+        IpPermission ipPerm = new IpPermission()
+                .withIpProtocol(securityGroup.getIpProtocol1())
+                .withToPort(securityGroup.getToPort1())
+                .withFromPort(securityGroup.getFromPort1())
+                .withIpv4Ranges(ipRange);
+
+        IpPermission ipPerm2 = new IpPermission()
+                .withIpProtocol(securityGroup.getIpProtocol2())
+                .withToPort(securityGroup.getToPort2())
+                .withFromPort(securityGroup.getFromPort2())
+                .withIpv4Ranges(ipRange);
+
+        AuthorizeSecurityGroupIngressRequest authRequest = new
+                AuthorizeSecurityGroupIngressRequest()
+                .withGroupName(securityGroup.getGroupName())
+                .withIpPermissions(ipPerm, ipPerm2);
+
+        AuthorizeSecurityGroupIngressResult authResponse =
+                ec2.authorizeSecurityGroupIngress(authRequest);
+
+        System.out.printf(
+                "Successfully added ingress policy to security group %s",
+                securityGroup.getGroupName());
+    }
+
+    public static void describeSecurityGroup(final String[] groupId)
+    {
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
+
+        /*if (args.length != 1) {
+            System.out.println(USAGE);
+            System.exit(1);
+        }
+
+        String group_id = args[0];*/
+
+        DescribeSecurityGroupsRequest request =
+                new DescribeSecurityGroupsRequest()
+                        .withGroupIds(groupId);
+
+        DescribeSecurityGroupsResult response =
+                ec2.describeSecurityGroups(request);
+
+        for(SecurityGroup group : response.getSecurityGroups()) {
+            System.out.printf(
+                    "Found security group with id %s, " +
+                            "vpc id %s " +
+                            "and description %s",
+                    group.getGroupId(),
+                    group.getVpcId(),
+                    group.getDescription());
+        }
+    }
+
+    public static void deleteSecurityGroup(final String groupId)
+    {
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
+
+        DeleteSecurityGroupRequest request = new DeleteSecurityGroupRequest()
+                .withGroupId(groupId);
+
+        DeleteSecurityGroupResult response = ec2.deleteSecurityGroup(request);
+
+        System.out.printf(
+                "Successfully deleted security group with id %s", groupId);
+    }
+
+    public static Results.InstanceResults runInstance(final AmazonEc2 ec2){
 
         RunInstancesRequest runInstancesRequest = new RunInstancesRequest();
 
@@ -52,11 +138,15 @@ public class Requests {
         // TAG EC2 INSTANCES
         List<Instance> instances = result.getOriginalResults().getReservation().getInstances();
         int id = 1;
-        ArrayList<ArrayList<String>> tags = ec2.getTags();
+
+        ArrayList<String> singleTagWithOnly2Items = new ArrayList<String>();
+        singleTagWithOnly2Items.add("key");
+        singleTagWithOnly2Items.add("value");
+        ec2.addTag(singleTagWithOnly2Items);
 
         for (Instance instance : instances) {
             CreateTagsRequest createTagsRequest = new CreateTagsRequest();
-            for (ArrayList<String> tag : tags){
+            for (ArrayList<String> tag : ec2.getTags()){
                 createTagsRequest.withResources(instance.getInstanceId()) //
                         .withTags(new Tag(tag.get(0), tag.get(1)+" - "+id));
             }
@@ -68,7 +158,8 @@ public class Requests {
         return result;
     }
 
-    public static void stopInstance(final String instanceId, final AmazonEC2 ec2){
+    public static void stopInstance(final String instanceId){
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
         StopInstancesRequest stopInstancesRequest = new StopInstancesRequest().withInstanceIds(instanceId);
         StopInstancesResult stopInstancesResult = ec2.stopInstances(stopInstancesRequest);
         List<InstanceStateChange> stateChangeList = stopInstancesResult.getStoppingInstances();
@@ -76,7 +167,8 @@ public class Requests {
         System.out.println(stateChangeList.toString());
     }
 
-    public static void startInstance(final String instanceId, final AmazonEC2 ec2){
+    public static void startInstance(final String instanceId){
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
         StartInstancesRequest startRequest = new StartInstancesRequest()
                 .withInstanceIds(instanceId);
         StartInstancesResult startResult = ec2.startInstances(startRequest);
@@ -85,7 +177,8 @@ public class Requests {
         System.out.println(stateChangeList.toString());
     }
 
-    public static void rebootInstance(final String instanceId, final AmazonEC2 ec2){
+    public static void rebootInstance(final String instanceId){
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
         RebootInstancesRequest request = new RebootInstancesRequest()
                 .withInstanceIds(instanceId);
         RebootInstancesResult response = ec2.rebootInstances(request);
@@ -93,7 +186,8 @@ public class Requests {
                 "Successfully rebooted instance %s", instanceId);
     }
 
-    public static void enableMonitorInstance(final String instanceId, final AmazonEC2 ec2){
+    public static void enableInstanceMonitoring(final String instanceId){
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
         MonitorInstancesRequest request = new MonitorInstancesRequest()
                 .withInstanceIds(instanceId);
         MonitorInstancesResult response = ec2.monitorInstances(request);
@@ -102,7 +196,8 @@ public class Requests {
         System.out.println(instanceMonitoringList.toString());
     }
 
-    public static void disableeMonitorInstance(final String instanceId, final AmazonEC2 ec2){
+    public static void disableInstanceMonitoring(final String instanceId){
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
         UnmonitorInstancesRequest request = new UnmonitorInstancesRequest()
                 .withInstanceIds(instanceId);
         UnmonitorInstancesResult response = ec2.unmonitorInstances(request);
@@ -111,7 +206,8 @@ public class Requests {
         System.out.println(instanceMonitoringList.toString());
     }
 
-    public static void describeInstance(final AmazonEC2 ec2){
+    public static void describeInstances(){
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
         boolean done = false;
 
         while(!done) {
@@ -142,8 +238,9 @@ public class Requests {
         }
     }
 
-    public static void terminateInstance(final String instanceId, final AmazonEC2 ec2)
+    public static void terminateInstance(final String instanceId)
     {
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
         TerminateInstancesRequest terminateInstancesRequest =
                 new TerminateInstancesRequest().withInstanceIds(instanceId);
         TerminateInstancesResult terminateInstancesResult =
@@ -180,46 +277,22 @@ public class Requests {
         System.out.println(associate_response.toString());
     }
 
-    public static void createSecurityGroup(final SecurityGroup securityGroup, final AmazonEC2 ec2){
-        CreateSecurityGroupRequest create_request = new
-                CreateSecurityGroupRequest()
-                .withGroupName(securityGroup.getGroupName())
-                .withDescription(securityGroup.getGroupDescription())
-                .withVpcId(securityGroup.getVpcId());
+    public static void describeElasticIP(){
+        final AmazonEC2 ec2 = AmazonEC2ClientBuilder.defaultClient();
 
-        CreateSecurityGroupResult create_response =
-                ec2.createSecurityGroup(create_request);
+        DescribeAddressesResult response = ec2.describeAddresses();
 
-        System.out.printf(
-                "Successfully created security group named %s",
-                securityGroup.getGroupName());
-
-        IpRange ip_range = new IpRange()
-                .withCidrIp(securityGroup.getcIDrIp());
-
-        IpPermission ip_perm = new IpPermission()
-                .withIpProtocol(securityGroup.getIpProtocol1())
-                .withToPort(securityGroup.getToPort1())
-                .withFromPort(securityGroup.getFromPort1())
-                .withIpv4Ranges(ip_range);
-
-        IpPermission ip_perm2 = new IpPermission()
-                .withIpProtocol(securityGroup.getIpProtocol2())
-                .withToPort(securityGroup.getToPort2())
-                .withFromPort(securityGroup.getFromPort2())
-                .withIpv4Ranges(ip_range);
-
-        AuthorizeSecurityGroupIngressRequest auth_request = new
-                AuthorizeSecurityGroupIngressRequest()
-                .withGroupName(securityGroup.getGroupName())
-                .withIpPermissions(ip_perm, ip_perm2);
-
-        AuthorizeSecurityGroupIngressResult auth_response =
-                ec2.authorizeSecurityGroupIngress(auth_request);
-
-        System.out.printf(
-                "Successfully added ingress policy to security group %s",
-                securityGroup.getGroupName());
+        for(Address address : response.getAddresses()) {
+            System.out.printf(
+                    "Found address with public IP %s, " +
+                            "domain %s, " +
+                            "allocation id %s " +
+                            "and NIC id %s",
+                    address.getPublicIp(),
+                    address.getDomain(),
+                    address.getAllocationId(),
+                    address.getNetworkInterfaceId());
+        }
     }
 
     public static void releaseElasticIP(final String alloc_id){
@@ -235,8 +308,8 @@ public class Requests {
         System.out.println(response);
     }
 
-    public static void adjustVolume(final String instanceId, final AmazonEC2 ec2, String volumeId, int volumeSize) {
-
+    public static void adjustInstanceVolume(final String instanceId, final String volumeId, final int volumeSize) {
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
         ModifyVolumeRequest modifyVolumeRequest = new ModifyVolumeRequest();
         modifyVolumeRequest.setSize(volumeSize);
         modifyVolumeRequest.withVolumeId(volumeId);
@@ -248,7 +321,8 @@ public class Requests {
 
     }
 
-    public static void changeInstanceType(final String instanceId, final AmazonEC2 ec2, String instanceType){
+    public static void changeInstanceType(final String instanceId, final String instanceType){
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
         ModifyInstanceAttributeRequest modifyInstanceAttributeRequest = new ModifyInstanceAttributeRequest();
         modifyInstanceAttributeRequest.withInstanceId(instanceId);
         modifyInstanceAttributeRequest.withInstanceType(instanceType);
@@ -258,25 +332,86 @@ public class Requests {
         System.out.println("Modifying instance '" + instanceId + "':");
     }
 
-    public static void createEC2Volume(final String instanceId, final AmazonEC2 ec2, int volumeSize, Regions region)
+    public static void createVolume(final AmazonVolume amazonVolume)
     {
-        System.out.println("Creating the volume begins...");
-        CreateVolumeRequest  creq = new CreateVolumeRequest(volumeSize, region.getName());
-        creq.setVolumeType(VolumeType.Gp2);
-        CreateVolumeResult cres =  ec2.createVolume(creq);
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
+        /* Yet to Test Code */
+        CreateVolumeRequest createVolumeRequest = new CreateVolumeRequest()
+                .withVolumeType(amazonVolume.getVolumeType())
+                .withAvailabilityZone(amazonVolume.getAvailabilityZone()) // The AZ in which to create the volume.
+                .withSize(amazonVolume.getVolumeSize()); // The size of the volume, in gigabytes.
 
-        // Create the list of tags we want to create
-        System.out.println("Setting the tags to the volume...");
-        ArrayList<Tag> instanceTags = new ArrayList<Tag>();
-        instanceTags.add(new Tag("Name","scedar-group-volume"));
+        CreateVolumeResult createVolumeResult = ec2.createVolume(createVolumeRequest);
+        createVolumeResult.getVolume().getVolumeType();
+        System.out.println("Volume of size - "+createVolumeResult.getVolume().getSize() +
+                ", volume id - " + createVolumeResult.getVolume().getVolumeId() +
+                " and volume type - "+createVolumeResult.getVolume().getVolumeType()+
+                " has been created successfully");
 
-        CreateTagsRequest createTagsRequest = new CreateTagsRequest().withTags(instanceTags).withResources(cres.getVolume().getVolumeId());
-        ec2.createTags(createTagsRequest);
-        System.out.println("Attaching the volume to the instance....");
-        AttachVolumeRequest areq = new AttachVolumeRequest(cres.getVolume().getVolumeId(),instanceId, "/dev/xvdh");
-        AttachVolumeResult ares = ec2.attachVolume(areq);
-        System.out.println("Creating the volume ends...");
+    }
 
+    public static void attachVolumeToEC2Instance(final String instanceId, final AmazonVolume amazonVolume)
+    {
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
+        AttachVolumeRequest attachRequest = new AttachVolumeRequest()
+                .withInstanceId(instanceId)
+                .withDevice(amazonVolume.getDevice())
+                .withVolumeId(amazonVolume.getVolumeId());
+
+        AttachVolumeResult attachResult = ec2.attachVolume(attachRequest);
+
+        System.out.println("Volume of volume id - "+attachResult.getAttachment().getVolumeId() +
+                ", and device - " + attachResult.getAttachment().getDevice() +
+                " has been successfully attached to"+
+                " instance with id - "+attachResult.getAttachment().getInstanceId());
+    }
+    public static void detachVolume(final String instanceId, final AmazonVolume amazonVolume)
+    {
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
+        /* Yet to Test Code */
+        DetachVolumeRequest detachRequest = new DetachVolumeRequest()
+                .withInstanceId(instanceId)
+                .withDevice(amazonVolume.getDevice())
+                .withVolumeId(amazonVolume.getVolumeId());
+
+        DetachVolumeResult detachResult = ec2.detachVolume(detachRequest);
+
+        System.out.println("Volume of volume id - "+detachResult.getAttachment().getVolumeId() +
+                ", and device - " + detachResult.getAttachment().getDevice() +
+                " has been successfully detached from "+
+                " instance with id - "+detachResult.getAttachment().getInstanceId());
+
+    }
+
+
+    public static void describeRegionsAndZones()
+    {
+        final AmazonEC2 ec2 = AmazonEc2.getAmazonEC2(AwsCredentials.getAwsCredentials());
+
+        DescribeRegionsResult regionsResponse = ec2.describeRegions();
+
+        for(Region region : regionsResponse.getRegions()) {
+            System.out.printf(
+                    "Found region %s " +
+                            "with endpoint %s",
+                    region.getRegionName(),
+                    region.getEndpoint()+
+                            "\n\n");
+        }
+
+        DescribeAvailabilityZonesResult zonesResponse =
+                ec2.describeAvailabilityZones();
+
+        for(AvailabilityZone zone : zonesResponse.getAvailabilityZones()) {
+            System.out.printf(
+                    "Found availability zone %s " +
+                            "with status %s " +
+                            "in region %s",
+                    zone.getZoneName(),
+                    zone.getState(),
+                    zone.getRegionName()+
+                            "\n\n");
+        }
     }
 
 }

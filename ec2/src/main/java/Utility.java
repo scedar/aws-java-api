@@ -46,22 +46,4 @@ public class Utility {
         ec2.setTags(tags);
         return ec2;
     }
-
-    public static void describeElasticIP(){
-        final AmazonEC2 ec2 = AmazonEC2ClientBuilder.defaultClient();
-
-        DescribeAddressesResult response = ec2.describeAddresses();
-
-        for(Address address : response.getAddresses()) {
-            System.out.printf(
-                    "Found address with public IP %s, " +
-                            "domain %s, " +
-                            "allocation id %s " +
-                            "and NIC id %s",
-                    address.getPublicIp(),
-                    address.getDomain(),
-                    address.getAllocationId(),
-                    address.getNetworkInterfaceId());
-        }
-    }
 }

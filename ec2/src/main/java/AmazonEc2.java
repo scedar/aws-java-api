@@ -28,12 +28,42 @@ public class AmazonEc2 {
     private String additionalInfo;
     private ArrayList<ArrayList<String>> tags;
 
-    public static AmazonEC2 initializeObject(AWSCredentials awsCredentials){
-        return new AmazonEC2Client(awsCredentials);
+
+    //Constructors
+    AmazonEc2(AWSCredentials awsCredentials, Regions region){
+        final AmazonEC2 ec2;
+        ec2 = new AmazonEC2Client(awsCredentials);
+        ec2.setRegion(Region.getRegion(region));
+        this.ec2Instance = ec2;
+    }
+
+    AmazonEc2(AWSCredentials awsCredentials){
+        final AmazonEC2 ec2;
+        ec2 = new AmazonEC2Client(awsCredentials);
+        ec2.setRegion(Region.getRegion(Regions.US_WEST_2));
+        this.ec2Instance = ec2;
+    }
+
+    AmazonEc2(AmazonEC2 ec2){
+        this.ec2Instance = ec2;
+    }
+
+    // Global Static functions
+    public static AmazonEC2 getAmazonEC2(AWSCredentials awsCredentials, Regions region){
+        final AmazonEC2 ec2;
+        ec2 = new AmazonEC2Client(awsCredentials);
+        ec2.setRegion(Region.getRegion(region));
+        return ec2;
+    }
+
+    public static AmazonEC2 getAmazonEC2(AWSCredentials awsCredentials){
+        final AmazonEC2 ec2;
+        ec2 = new AmazonEC2Client(awsCredentials);
+        ec2.setRegion(Region.getRegion(Regions.US_WEST_2));
+        return ec2;
     }
 
     //Setters
-
     public void setEc2Instance(AmazonEC2 ec2Instance) {
         this.ec2Instance = ec2Instance;
     }
@@ -92,6 +122,10 @@ public class AmazonEc2 {
 
     public void setTags(ArrayList<ArrayList<String>> tags) {
         this.tags = tags;
+    }
+
+    public void addTag(ArrayList<String> tag){
+        this.tags.add(tag);
     }
 
 

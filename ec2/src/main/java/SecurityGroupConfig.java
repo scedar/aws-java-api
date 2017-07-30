@@ -1,4 +1,4 @@
-public class SecurityGroup {
+public class SecurityGroupConfig {
     private String groupName;
     private String groupDescription;
     private String vpcId;
@@ -9,8 +9,9 @@ public class SecurityGroup {
     private String ipProtocol2;
     private int toPort2;
     private int fromPort2;
+    private String groupId;
 
-    SecurityGroup(){
+    SecurityGroupConfig(){
         this.cIDrIp = "0.0.0.0/0";
         this.ipProtocol1 = "tcp";
         this.ipProtocol2 = "tcp";
@@ -61,6 +62,10 @@ public class SecurityGroup {
         return fromPort2;
     }
 
+    public String getGroupId() {
+        return groupId;
+    }
+
     public void setGroupName(String groupName) {
         this.groupName = groupName;
     }
@@ -99,5 +104,9 @@ public class SecurityGroup {
 
     public void setFromPort2(int fromPort2) {
         this.fromPort2 = fromPort2;
+    }
+
+    public void setGroupId(String groupId) {
+        this.groupId = groupId;
     }
 }
